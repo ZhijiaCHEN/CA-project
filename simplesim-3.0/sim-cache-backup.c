@@ -1,11 +1,3 @@
-/* Topics in Computer Architecture - Final Project
- * Addition of Level 3 caches
- *   James Sant'Angelo
- *   Mike Testen
- *
- * Search "LVL3" to locate changes
- */
-
 /* sim-cache.c - sample cache simulator implementation */
 
 /* SimpleScalar(TM) Tool Suite
@@ -99,17 +91,11 @@ static struct cache_t *cache_il1 = NULL;
 /* level 2 instruction cache */
 static struct cache_t *cache_il2 = NULL;
 
-/* level 3 instruction cache */
-static struct cache_t *cache_il3 = NULL; // LVL3 Added
-
 /* level 1 data cache, entry level data cache */
 static struct cache_t *cache_dl1 = NULL;
 
 /* level 2 data cache */
 static struct cache_t *cache_dl2 = NULL;
-
-/* level 3 data cache */
-static struct cache_t *cache_dl3 = NULL; // LVL3 Added
 
 /* instruction TLB */
 static struct cache_t *itlb = NULL;
@@ -118,7 +104,7 @@ static struct cache_t *itlb = NULL;
 static struct cache_t *dtlb = NULL;
 
 /* text-based stat profiles */
-#define MAX_PCSTAT_VARS 10 // LVL3 Modified: Increased from 8 to 10.
+#define MAX_PCSTAT_VARS 8
 static struct stat_stat_t *pcstat_stats[MAX_PCSTAT_VARS];
 static counter_t pcstat_lastvals[MAX_PCSTAT_VARS];
 static struct stat_stat_t *pcstat_sdists[MAX_PCSTAT_VARS];
@@ -154,22 +140,6 @@ dl1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
     }
 }
 
-/* l1 data cache block presence count update function */
-void dl1_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    if (inclusive & cache_dl2)
-    {
-        /* access next level of data cache hierarchy */
-        return update_block_present_count(cache_dl2, increase, baddr);
-    }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return;
-    }
-}
-
 /* l2 data cache block miss handler function */
 static unsigned int                    /* latency of block access */
 dl2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
@@ -178,57 +148,9 @@ dl2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
               struct cache_blk_t *blk, /* ptr to block in upper level */
               tick_t now)              /* time of access */
 {
-    // LVL3 Modified (BEGIN): Redirect to level 3 cache if it exists.
-    if (cache_dl3)
-    {
-        /* access next level of data cache hierarchy */
-        return cache_access(cache_dl3, cmd, baddr, NULL, bsize,
-                            /* now */ now, /* pudata */ NULL, /* repl addr */ NULL);
-    }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return /* access latency, ignored */ 1;
-    }
-    // LVL3 Modified (END)
-}
-
-/* l2 data cache block presence count update function */
-void dl2_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    if (inclusive & cache_dl3)
-    {
-        /* access next level of data cache hierarchy */
-        return update_block_present_count(cache_dl3, increase, baddr);
-    }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return;
-    }
-}
-
-// LVL3 Added (BEGIN): Level 3 data-cache handler function
-/* l3 data cache block miss handler function */
-static unsigned int                    /* latency of block access */
-dl3_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
-              md_addr_t baddr,         /* block address to access */
-              int bsize,               /* size of block to access */
-              struct cache_blk_t *blk, /* ptr to block in upper level */
-              tick_t now)              /* time of access */
-{
     /* this is a miss to the lowest level, so access main memory, which is
      always done in the main simulator loop */
     return /* access latency, ignored */ 1;
-}
-// LVL3 Added (END)
-
-/* l3 data cache block presence count update function */
-void dl3_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    return;
 }
 
 /* l1 inst cache l1 block miss handler function */
@@ -252,22 +174,6 @@ il1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
     }
 }
 
-/* l1 inst cache block presence count update function */
-void il1_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    if (inclusive & cache_il2)
-    {
-        /* access next level of data cache hierarchy */
-        return update_block_present_count(cache_il2, increase, baddr);
-    }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return;
-    }
-}
-
 /* l2 inst cache block miss handler function */
 static unsigned int                    /* latency of block access */
 il2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
@@ -276,64 +182,9 @@ il2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
               struct cache_blk_t *blk, /* ptr to block in upper level */
               tick_t now)              /* time of access */
 {
-    // LVL3 Modified (BEGIN): Redirect to level 3 cache if it exists.
-    if (cache_il3)
-    {
-        /* access next level of inst cache hierarchy */
-        return cache_access(cache_il3, cmd, baddr, NULL, bsize,
-                            /* now */ now, /* pudata */ NULL, /* repl addr */ NULL);
-    }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return /* access latency, ignored */ 1;
-    }
-    // LVL3 Modified (END)
-}
-
-/* l2 inst cache block presence count update function */
-void il2_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    if (inclusive & cache_il3)
-    {
-        /* access next level of data cache hierarchy */
-        return update_block_present_count(cache_il3, increase, baddr);
-    }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return;
-    }
-}
-
-// LVL3 Added (BEGIN): Level 3 instruction-cache handler function.
-/* l3 inst cache block miss handler function */
-static unsigned int                    /* latency of block access */
-il3_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
-              md_addr_t baddr,         /* block address to access */
-              int bsize,               /* size of block to access */
-              struct cache_blk_t *blk, /* ptr to block in upper level */
-              tick_t now)              /* time of access */
-{
     /* this is a miss to the lowest level, so access main memory, which is
      always done in the main simulator loop */
     return /* access latency, ignored */ 1;
-}
-// LVL3 Added (END)
-
-/* l3 inst cache block presence count update function */
-void il3_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    return;
-}
-
-/* TLB cache block presence count update function */
-void tlb_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    return;
 }
 
 /* inst cache block miss handler function */
@@ -377,15 +228,12 @@ dtlb_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 /* cache/TLB options */
 static char *cache_dl1_opt /* = "none" */;
 static char *cache_dl2_opt /* = "none" */;
-static char *cache_dl3_opt /* = "none" */; // LVL3 Added
 static char *cache_il1_opt /* = "none" */;
 static char *cache_il2_opt /* = "none" */;
-static char *cache_il3_opt /* = "none" */; // LVL3 Added
 static char *itlb_opt /* = "none" */;
 static char *dtlb_opt /* = "none" */;
 static int flush_on_syscalls /* = FALSE */;
 static int compress_icache_addrs /* = FALSE */;
-static int inclusive /* = FALSE */;
 
 /* text-based stat profiles */
 static int pcstat_nelt = 0;
@@ -402,13 +250,13 @@ static char *pcstat_vars[MAX_PCSTAT_VARS];
 #define ISCOMPRESS(SZ) (SZ)
 #endif /* TARGET_PISA */
 
-/* Register simulator-specific options */
+/* Registe simulator-specific options */
 void sim_reg_options(struct opt_odb_t *odb) /* options database */
 {
     opt_reg_header(odb,
                    "sim-cache: This simulator implements a functional cache simulator.  Cache\n"
                    "statistics are generated for a user-selected cache and TLB configuration,\n"
-                   "which may include up to three levels of instruction and data cache (with any\n"
+                   "which may include up to two levels of instruction and data cache (with any\n"
                    "levels unified), and one level of instruction and data TLBs.  No timing\n"
                    "information is generated.\n");
 
@@ -436,17 +284,13 @@ void sim_reg_options(struct opt_odb_t *odb) /* options database */
     opt_reg_string(odb, "-cache:dl2",
                    "l2 data cache config, i.e., {<config>|none}",
                    &cache_dl2_opt, "ul2:1024:64:4:l", /* print */ TRUE, NULL);
-    opt_reg_string(odb, "-cache:dl3",
-                   "l3 data cache config, i.e., {<config>|none}",
-                   &cache_dl3_opt, "ul3:1024:64:4:l", /* print */ TRUE, NULL); // LVL3 Added
-
     opt_reg_string(odb, "-cache:il1",
                    "l1 inst cache config, i.e., {<config>|dl1|dl2|none}",
                    &cache_il1_opt, "il1:256:32:1:l", /* print */ TRUE, NULL);
     opt_reg_note(odb,
                  "  Cache levels can be unified by pointing a level of the instruction cache\n"
-                 "  hierarchy at the data cache hiearchy using the \"dl1\", \"dl2\", and \"dl3\" \n"
-                 "  cache configuration arguments.  Most sensible combinations are supported, e.g.,\n"
+                 "  hierarchy at the data cache hiearchy using the \"dl1\" and \"dl2\" cache\n"
+                 "  configuration arguments.  Most sensible combinations are supported, e.g.,\n"
                  "\n"
                  "    A unified l2 cache (il2 is pointed at dl2):\n"
                  "      -cache:il1 il1:128:64:1:l -cache:il2 dl2\n"
@@ -458,9 +302,6 @@ void sim_reg_options(struct opt_odb_t *odb) /* options database */
     opt_reg_string(odb, "-cache:il2",
                    "l2 instruction cache config, i.e., {<config>|dl2|none}",
                    &cache_il2_opt, "dl2", /* print */ TRUE, NULL);
-    opt_reg_string(odb, "-cache:il3",
-                   "l3 instruction cache config, i.e., {<config>|dl3|none}",
-                   &cache_il3_opt, "dl3", /* print */ TRUE, NULL); // LVL3 Added
     opt_reg_string(odb, "-tlb:itlb",
                    "instruction TLB config, i.e., {<config>|none}",
                    &itlb_opt, "itlb:16:4096:4:l", /* print */ TRUE, NULL);
@@ -472,10 +313,6 @@ void sim_reg_options(struct opt_odb_t *odb) /* options database */
     opt_reg_flag(odb, "-cache:icompress",
                  "convert 64-bit inst addresses to 32-bit inst equivalents",
                  &compress_icache_addrs, /* default */ FALSE,
-                 /* print */ TRUE, NULL);
-    opt_reg_flag(odb, "-inclusive",
-                 "construct inclusive caches",
-                 &inclusive, /* default */ FALSE,
                  /* print */ TRUE, NULL);
 
     opt_reg_string_list(odb, "-pcstat",
@@ -500,13 +337,6 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
         if (strcmp(cache_dl2_opt, "none"))
             fatal("the l1 data cache must defined if the l2 cache is defined");
         cache_dl2 = NULL;
-
-        // LVL3 Added (BEGIN): Error checking.
-        /* the level 3 D-cache cannot be defined */
-        if (strcmp(cache_dl3_opt, "none"))
-            fatal("the l1 data cache must defined if the l3 cache is defined");
-        cache_dl3 = NULL;
-        // LVL3 Added (END)
     }
     else /* dl1 is defined */
     {
@@ -515,20 +345,11 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
             fatal("bad l1 D-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
         cache_dl1 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
                                  /* usize */ 0, assoc, cache_char2policy(c),
-                                 dl1_access_fn, dl1_presence_cnt_fn, /* hit latency */ 1);
+                                 dl1_access_fn, /* hit latency */ 1);
 
         /* is the level 2 D-cache defined? */
         if (!mystricmp(cache_dl2_opt, "none"))
-        {
             cache_dl2 = NULL;
-
-            // LVL3 Added (BEGIN): Error checking.
-            /* the level 3 D-cache cannot be defined */
-            if (strcmp(cache_dl3_opt, "none"))
-                fatal("the l2 data cache must defined if the l3 cache is defined");
-            cache_dl3 = NULL;
-            // LVL3 Added (END)
-        }
         else
         {
             if (sscanf(cache_dl2_opt, "%[^:]:%d:%d:%d:%c",
@@ -537,23 +358,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                       "<name>:<nsets>:<bsize>:<assoc>:<repl>");
             cache_dl2 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
                                      /* usize */ 0, assoc, cache_char2policy(c),
-                                     dl2_access_fn, dl2_presence_cnt_fn, /* hit latency */ 1);
-
-            // LVL3 Added (BEGIN): Level 3 data cache creation.
-            /* is the level 3 D-cache defined? */
-            if (!mystricmp(cache_dl3_opt, "none"))
-                cache_dl3 = NULL;
-            else
-            {
-                if (sscanf(cache_dl3_opt, "%[^:]:%d:%d:%d:%c",
-                           name, &nsets, &bsize, &assoc, &c) != 5)
-                    fatal("bad l3 D-cache parms: "
-                          "<name>:<nsets>:<bsize>:<assoc>:<repl>");
-                cache_dl3 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                         /* usize */ 0, assoc, cache_char2policy(c),
-                                         dl3_access_fn, dl3_presence_cnt_fn, /* hit latency */ 1);
-            }
-            // LVL3 Added (END)
+                                     dl2_access_fn, /* hit latency */ 1);
         }
     }
 
@@ -566,13 +371,6 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
         if (strcmp(cache_il2_opt, "none"))
             fatal("the l1 inst cache must defined if the l2 cache is defined");
         cache_il2 = NULL;
-
-        // LVL3 Added (BEGIN): Error checking.
-        /* the level 3 I-cache cannot be defined */
-        if (strcmp(cache_il3_opt, "none"))
-            fatal("the l1 inst cache must defined if the l3 cache is defined");
-        cache_il3 = NULL;
-        // LVL3 Added (END)
     }
     else if (!mystricmp(cache_il1_opt, "dl1"))
     {
@@ -584,13 +382,6 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
         if (strcmp(cache_il2_opt, "none"))
             fatal("the l1 inst cache must defined if the l2 cache is defined");
         cache_il2 = NULL;
-
-        // LVL3 Added (BEGIN): Error checking.
-        /* the level 3 I-cache cannot be defined */
-        if (strcmp(cache_il3_opt, "none"))
-            fatal("the l1 inst cache must defined if the l3 cache is defined");
-        cache_il3 = NULL;
-        // LVL3 Added (END)
     }
     else if (!mystricmp(cache_il1_opt, "dl2"))
     {
@@ -602,22 +393,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
         if (strcmp(cache_il2_opt, "none"))
             fatal("the l1 inst cache must defined if the l2 cache is defined");
         cache_il2 = NULL;
-
-        // LVL3 Added (BEGIN): Error checking.
-        /* the level 3 I-cache cannot be defined */
-        if (strcmp(cache_il3_opt, "none"))
-            fatal("the l1 inst cache must defined if the l3 cache is defined");
-        cache_il3 = NULL;
-        // LVL3 Added (END)
     }
-    // LVL3 Added (BEGIN): Link instruction level 1 with data level 3 cache.
-    else if (!mystricmp(cache_il1_opt, "dl3"))
-    {
-        if (!cache_dl3)
-            fatal("I-cache l1 cannot access D-cache l3 as it's undefined");
-        cache_il1 = cache_dl3;
-    }
-    // LVL3 Added (END)
     else /* il1 is defined */
     {
         if (sscanf(cache_il1_opt, "%[^:]:%d:%d:%d:%c",
@@ -625,41 +401,17 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
             fatal("bad l1 I-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
         cache_il1 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
                                  /* usize */ 0, assoc, cache_char2policy(c),
-                                 il1_access_fn, il1_presence_cnt_fn, /* hit latency */ 1);
+                                 il1_access_fn, /* hit latency */ 1);
 
         /* is the level 2 D-cache defined? */
         if (!mystricmp(cache_il2_opt, "none"))
-        {
             cache_il2 = NULL;
-
-            // LVL3 Added (BEGIN): Error checking.
-            /* the level 3 I-cache cannot be defined */
-            if (strcmp(cache_il3_opt, "none"))
-                fatal("the l2 inst cache must defined if the l3 cache is defined");
-            cache_il3 = NULL;
-            // LVL3 Added (END)
-        }
         else if (!mystricmp(cache_il2_opt, "dl2"))
         {
             if (!cache_dl2)
                 fatal("I-cache l2 cannot access D-cache l2 as it's undefined");
             cache_il2 = cache_dl2;
-
-            // LVL3 Added (BEGIN): Error checking.
-            /* the level 3 I-cache cannot be defined */
-            if (strcmp(cache_il3_opt, "none"))
-                fatal("the l2 inst cache must defined if the l3 cache is defined");
-            cache_il3 = NULL;
-            // LVL3 Added (END)
         }
-        // LVL3 Added (BEGIN): Link instruction level 2 with data level 3 cache.
-        else if (!mystricmp(cache_il2_opt, "dl3"))
-        {
-            if (!cache_dl3)
-                fatal("I-cache l2 cannot access D-cache l3 as it's undefined");
-            cache_il2 = cache_dl3;
-        }
-        // LVL3 Added (END)
         else
         {
             if (sscanf(cache_il2_opt, "%[^:]:%d:%d:%d:%c",
@@ -668,29 +420,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                       "<name>:<nsets>:<bsize>:<assoc>:<repl>");
             cache_il2 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
                                      /* usize */ 0, assoc, cache_char2policy(c),
-                                     il2_access_fn, il2_presence_cnt_fn, /* hit latency */ 1);
-
-            // LVL3 Added (BEGIN): Level 3 instruction cache creation.
-            /* is the level 3 I-cache defined? */
-            if (!mystricmp(cache_il3_opt, "none"))
-                cache_il3 = NULL;
-            else if (!mystricmp(cache_il3_opt, "dl3"))
-            {
-                if (!cache_dl3)
-                    fatal("I-cache l3 cannot access D-cache l3 as it's undefined");
-                cache_il3 = cache_dl3;
-            }
-            else
-            {
-                if (sscanf(cache_il3_opt, "%[^:]:%d:%d:%d:%c",
-                           name, &nsets, &bsize, &assoc, &c) != 5)
-                    fatal("bad l3 I-cache parms: "
-                          "<name>:<nsets>:<bsize>:<assoc>:<repl>");
-                cache_il3 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                         /* usize */ 0, assoc, cache_char2policy(c),
-                                         il3_access_fn, il3_presence_cnt_fn, /* hit latency */ 1);
-            }
-            // LVL3 Added (END)
+                                     il2_access_fn, /* hit latency */ 1);
         }
     }
 
@@ -703,11 +433,8 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                    name, &nsets, &bsize, &assoc, &c) != 5)
             fatal("bad TLB parms: <name>:<nsets>:<page_size>:<assoc>:<repl>");
         itlb = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                            /* usize */ sizeof(md_addr_t),
-                            assoc,
-                            cache_char2policy(c),
-                            itlb_access_fn,
-                            tlb_presence_cnt_fn,
+                            /* usize */ sizeof(md_addr_t), assoc,
+                            cache_char2policy(c), itlb_access_fn,
                             /* hit latency */ 1);
     }
 
@@ -720,11 +447,8 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                    name, &nsets, &bsize, &assoc, &c) != 5)
             fatal("bad TLB parms: <name>:<nsets>:<page_size>:<assoc>:<repl>");
         dtlb = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                            /* usize */ sizeof(md_addr_t),
-                            assoc,
-                            cache_char2policy(c),
-                            dtlb_access_fn,
-                            tlb_presence_cnt_fn,
+                            /* usize */ sizeof(md_addr_t), assoc,
+                            cache_char2policy(c), dtlb_access_fn,
                             /* hit latency */ 1);
     }
 }
@@ -794,20 +518,14 @@ void sim_reg_stats(struct stat_sdb_t *sdb) /* stats database */
                      "sim_num_insn / sim_elapsed_time", NULL);
 
     /* register cache stats */
-    // LVL3 Modified (BEGIN): Register the new caches.
-    if (cache_il1 && (cache_il1 != cache_dl1 && cache_il1 != cache_dl2 && cache_il1 != cache_dl3))
+    if (cache_il1 && (cache_il1 != cache_dl1 && cache_il1 != cache_dl2))
         cache_reg_stats(cache_il1, sdb);
-    if (cache_il2 && (cache_il2 != cache_dl2 && cache_il2 != cache_dl3))
+    if (cache_il2 && (cache_il2 != cache_dl1 && cache_il2 != cache_dl2))
         cache_reg_stats(cache_il2, sdb);
-    if (cache_il3 && (cache_il3 != cache_dl3))
-        cache_reg_stats(cache_il3, sdb);
     if (cache_dl1)
         cache_reg_stats(cache_dl1, sdb);
     if (cache_dl2)
         cache_reg_stats(cache_dl2, sdb);
-    if (cache_dl3)
-        cache_reg_stats(cache_dl3, sdb);
-    // LVL3 Modified (END)
     if (itlb)
         cache_reg_stats(itlb, sdb);
     if (dtlb)

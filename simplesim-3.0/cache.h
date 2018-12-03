@@ -128,9 +128,11 @@ struct cache_blk_t
     /* DATA should be pointer-aligned due to preceeding field */
     /* NOTE: this is a variable-size tail array, this must be the LAST field
      defined in this structure! */
-    byte_t data[1];       /* actual data block starts here, block size
+    byte_t data[1]; /* actual data block starts here, block size
 				   should probably be a multiple of 8 */
-    char presentFlag = 0; /* suppose the block size of upper level cache is no less than 1/8 of the block size of current cache, presentFlag tells which part of current block is present in upper level cache. For example, if current block size is 64B and the upper level cache block size is 8B, then binary 00000000 means no data of current block is present in the upper level cache, and binary 00010000 means 8B data of current block is present in the upper level cache which starting at the offset 4*8 = 64. */
+    unsigned int presentCnt;
+    unsigned int useCnt;
+    char presentFlag; /* suppose the block size of upper level cache is no less than 1/8 of the block size of current cache, presentFlag tells which part of current block is present in upper level cache. For example, if current block size is 64B and the upper level cache block size is 8B, then binary 00000000 means no data of current block is present in the upper level cache, and binary 00010000 means 8B data of current block is present in the upper level cache which starting at the offset 4*8 = 64. */
 };
 
 /* cache set definition (one or more blocks sharing the same set index) */
@@ -173,6 +175,10 @@ struct cache_t
                          int bsize,               /* size of the cache block */
                          struct cache_blk_t *blk, /* ptr to cache block struct */
                          tick_t now);             /* when fetch was initiated */
+
+    void (*blk_present_fn)(struct cache_t *cp, /* cache where the block belongs to */
+                           int increase,       /* increase present count? */
+                           md_addr_t addr);    /* address of access */
 
     /* derived data, for fast decoding */
     int hsize; /* cache set hash table size */
@@ -261,6 +267,10 @@ cache_access(struct cache_t *cp,    /* cache to access */
              tick_t now,            /* time of access */
              byte_t **udata,        /* for return of user data ptr */
              md_addr_t *repl_addr); /* for address of replaced block */
+
+void update_block_present_count(struct cache_t *cp, /* cache where the block belongs to */
+                                int increase,       /* increase present count? */
+                                md_addr_t addr);    /* address of access */
 
 /* cache access functions, these are safe, they check alignment and
    permissions */
