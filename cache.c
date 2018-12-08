@@ -665,7 +665,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
 
   /* update block status */
   repl->ready = now+lat;
-
+  repl->useCnt = 0; /*LFU reset*/
+  
   /* link this entry back into the hash table */
   if (cp->hsize)
     link_htab_ent(cp, &cp->sets[set], repl);
