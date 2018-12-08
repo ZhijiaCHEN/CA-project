@@ -81,6 +81,8 @@
  * generated (hence the distinction, "functional" simulator).
  */
 
+static int inclusive; //inclusive option, inclusive added.
+
 /* simulated registers */
 static struct regs_t regs;
 
@@ -158,46 +160,46 @@ dl1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void dl1_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    if (inclusive & cache_dl2)
-    {
-        /* access next level of data cache hierarchy */
-        return update_block_present_count(cache_dl2, increase, baddr);
+        if (inclusive && cache_dl2)
+        {
+            /* access next level of data cache hierarchy */
+            return update_block_present_count(cache_dl2, increase, baddr);
+        }
+        else
+        {
+            /* access main memory, which is always done in the main simulator loop */
+            return;
+        }
     }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return;
-    }
-}
 
-/* l2 data cache block miss handler function */
-static unsigned int                    /* latency of block access */
-dl2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
-              md_addr_t baddr,         /* block address to access */
-              int bsize,               /* size of block to access */
-              struct cache_blk_t *blk, /* ptr to block in upper level */
-              tick_t now)              /* time of access */
-{
-    // LVL3 Modified (BEGIN): Redirect to level 3 cache if it exists.
-    if (cache_dl3)
+    /* l2 data cache block miss handler function */
+    static unsigned int                    /* latency of block access */
+    dl2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
+                  md_addr_t baddr,         /* block address to access */
+                  int bsize,               /* size of block to access */
+                  struct cache_blk_t *blk, /* ptr to block in upper level */
+                  tick_t now)              /* time of access */
     {
-        /* access next level of data cache hierarchy */
-        return cache_access(cache_dl3, cmd, baddr, NULL, bsize,
-                            /* now */ now, /* pudata */ NULL, /* repl addr */ NULL);
+        // LVL3 Modified (BEGIN): Redirect to level 3 cache if it exists.
+        if (cache_dl3)
+        {
+            /* access next level of data cache hierarchy */
+            return cache_access(cache_dl3, cmd, baddr, NULL, bsize,
+                                /* now */ now, /* pudata */ NULL, /* repl addr */ NULL);
+        }
+        else
+        {
+            /* access main memory, which is always done in the main simulator loop */
+            return /* access latency, ignored */ 1;
+        }
+        // LVL3 Modified (END)
     }
-    else
-    {
-        /* access main memory, which is always done in the main simulator loop */
-        return /* access latency, ignored */ 1;
-    }
-    // LVL3 Modified (END)
-}
 
-/* l2 data cache block presence count update function */
-void dl2_presence_cnt_fn(int increase,
-                         md_addr_t baddr) /* block address to access */
-{
-    if (inclusive & cache_dl3)
+    /* l2 data cache block presence count update function */
+    void dl2_presence_cnt_fn(int increase,
+                             md_addr_t baddr) /* block address to access */
+    {
+        if (inclusive && cache_dl3)
     {
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_dl3, increase, baddr);
@@ -256,7 +258,7 @@ il1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void il1_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    if (inclusive & cache_il2)
+    if (inclusive && cache_il2)
     {
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_il2, increase, baddr);
@@ -295,7 +297,7 @@ il2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void il2_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    if (inclusive & cache_il3)
+    if (inclusive && cache_il3)
     {
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_il3, increase, baddr);
@@ -385,8 +387,6 @@ static char *itlb_opt /* = "none" */;
 static char *dtlb_opt /* = "none" */;
 static int flush_on_syscalls /* = FALSE */;
 static int compress_icache_addrs /* = FALSE */;
-static int inclusive /* = FALSE */;
-
 /* text-based stat profiles */
 static int pcstat_nelt = 0;
 static char *pcstat_vars[MAX_PCSTAT_VARS];
