@@ -176,10 +176,8 @@ struct cache_t
                          struct cache_blk_t *blk, /* ptr to cache block struct */
                          tick_t now);             /* when fetch was initiated */
 
-    void (*blk_present_fn)(struct cache_t *cp, /* cache where the block belongs to */
-                           int increase,       /* increase present count? */
+    void (*blk_present_fn)(int increase,       /* increase present count? */
                            md_addr_t addr);    /* address of access */
-
     /* derived data, for fast decoding */
     int hsize; /* cache set hash table size */
     md_addr_t blk_mask;

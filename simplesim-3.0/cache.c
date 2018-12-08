@@ -330,6 +330,9 @@ cache_create(char *name,               /* name of the cache */
     /* miss/replacement functions */
     cp->blk_access_fn = blk_access_fn;
 
+    /* block presence count update function. INCLUSIVE added */
+    cp->blk_present_fn = blk_present_cnt_fn;
+
     /* compute derived parameters */
     cp->hsize = CACHE_HIGHLY_ASSOC(cp) ? (assoc >> 2) : 0;
     cp->blk_mask = bsize - 1;
@@ -646,12 +649,14 @@ cache_access(struct cache_t *cp,   /* cache to access */
     /* update block tags */
     repl->tag = tag;
     repl->status = CACHE_BLK_VALID; /* dirty bit set on update */
+    repl->presentCnt = 0; /* reset present count. INCLUSIVE added. */
 
     /* read data block */
     lat += cp->blk_access_fn(Read, CACHE_BADDR(cp, addr), cp->bsize,
                              repl, now + lat);
 
     /* update presence count */
+    //printf("657 blk_present_fn address %p\n", cp->blk_present_fn);
     cp->blk_present_fn(1, CACHE_BADDR(cp, addr));
 
     /* copy data out of cache block */
@@ -749,20 +754,24 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
                                 int increase,       /* increase present count? */
                                 md_addr_t addr)     /* address of access */
 {
+    //printf("cache 756\n");
     md_addr_t tag = CACHE_TAG(cp, addr);
     md_addr_t set = CACHE_SET(cp, addr);
     struct cache_blk_t *blk;
     /* check for a fast hit: access to same block */
-    if (CACHE_TAGSET(cp, addr) == cp->last_tagset)
+    if (CACHE_TAGSET(cp, addr) == cp->last_tagset && cp->last_blk)
     {
+        printf("cache 763, current addr: %d, last_blk: %p\n", addr, cp->last_blk);
         /* hit in the same block */
         blk = cp->last_blk;
         blk->presentCnt += increase;
+        printf("block address %d count after update: %d\n", addr, blk->presentCnt);
         return;
     }
 
     if (cp->hsize)
     {
+        printf("cache 773\n");
         /* higly-associativity cache, access through the per-set hash tables */
         int hindex = CACHE_HASH(cp, tag);
 
@@ -773,12 +782,14 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
             {
                 blk->presentCnt += increase;
+                printf("block address %d count after update: %d\n", addr, blk->presentCnt);
                 return;
             }
         }
     }
     else
     {
+        //printf("cache 791\n");
         /* low-associativity cache, linear search the way list */
         for (blk = cp->sets[set].way_head;
              blk;
@@ -787,13 +798,14 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
             {
                 blk->presentCnt += increase;
+                printf("block address %d count after update: %d\n", addr, blk->presentCnt);
                 return;
             }
         }
     }
 
     /* cache block not found */
-    panic("%s misses a block present in upper level cache!", cp->name);
+    printf("%s misses a block present in upper level cache!\n", cp->name);
     return;
 }
 

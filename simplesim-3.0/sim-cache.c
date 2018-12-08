@@ -162,6 +162,7 @@ void dl1_presence_cnt_fn(int increase,
 {
     if (inclusive && cache_dl2)
     {
+        printf("sim-cache 165\n");
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_dl2, increase, baddr);
     }
@@ -199,6 +200,7 @@ dl2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void dl2_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
+    printf("sim-cache 203\n");
     if (inclusive && cache_dl3)
     {
         /* access next level of data cache hierarchy */
@@ -258,6 +260,7 @@ il1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void il1_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
+    printf("sim-cache 263\n");
     if (inclusive && cache_il2)
     {
         /* access next level of data cache hierarchy */
@@ -297,6 +300,7 @@ il2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void il2_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
+    printf("sim-cache 303\n");
     if (inclusive && cache_il3)
     {
         /* access next level of data cache hierarchy */
@@ -1007,7 +1011,7 @@ void sim_main(void)
     if (dlite_check_break(regs.regs_PC, /* no access */ 0, /* addr */ 0, 0, 0))
         dlite_main(regs.regs_PC - sizeof(md_inst_t), regs.regs_PC,
                    sim_num_insn, &regs, mem);
-
+    //printf("dl1 %p\ndl2 %p\ndl3 %p\nil1 %p\nil2 %p\nil3 %p\n", dl1_presence_cnt_fn, dl2_presence_cnt_fn, dl3_presence_cnt_fn, il1_presence_cnt_fn, il2_presence_cnt_fn, il3_presence_cnt_fn);
     while (TRUE)
     {
         /* maintain $r0 semantics */
@@ -1020,9 +1024,11 @@ void sim_main(void)
         if (itlb)
             cache_access(itlb, Read, IACOMPRESS(regs.regs_PC),
                          NULL, ISCOMPRESS(sizeof(md_inst_t)), 0, NULL, NULL);
+        //printf("sim-cache 1027\n");
         if (cache_il1)
             cache_access(cache_il1, Read, IACOMPRESS(regs.regs_PC),
                          NULL, ISCOMPRESS(sizeof(md_inst_t)), 0, NULL, NULL);
+        //printf("sim-cache 1031\n");
         MD_FETCH_INST(inst, mem, regs.regs_PC);
 
         /* keep an instruction count */
