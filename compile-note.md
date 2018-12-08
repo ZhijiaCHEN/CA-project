@@ -1,0 +1,3 @@
+1. Clone CA-project to the ca home directory in your simplescalar virtual machine.
+2. Copy `/home/ca/CA-project/simplesim-3.0/make-honghao.sh` and `/home/ca/CA-project/simplesim-3.0/make-zhijia.sh` to `/home/ca/simplescalar/simplesim-3.0` directory
+3. Run `/home/ca/CA-project/simplesim-3.0/make-honghao.sh` to build your codes, or `/home/ca/CA-project/simplesim-3.0/make-zhijia.sh` to build my codes. Please note that the two scripts files assume that you will only make chagnes to the `cache.h` and `cache.c` under the `CA-project` directory.
