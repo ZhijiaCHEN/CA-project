@@ -284,8 +284,8 @@ cache_create(char *name,               /* name of the cache */
                                            md_addr_t baddr, int bsize,
                                            struct cache_blk_t *blk,
                                            tick_t now),
-             unsigned int (*blk_present_cnt_fn)(int increase,
-                                                md_addr_t baddr),
+             void (*blk_present_cnt_fn)(int increase,
+                                        md_addr_t baddr),
              unsigned int hit_latency) /* latency in cycles for a hit */
 {
     struct cache_t *cp;
