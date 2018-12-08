@@ -603,25 +603,44 @@ cache_access(struct cache_t *cp,   /* cache to access */
         break;
     case Random:
     {
-        int bindex = myrand() & (cp->assoc - 1);
-        repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+       		int bindex = myrand() & (cp->assoc - 1);
+		repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+		while (repl->presentCnt != 0)
+		{
+			int bindex = myrand() & (cp->assoc - 1);
+			repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+		}
     }
     case LFU:// LFU added
     {   /* Find the least frequently used block*/
-        int min = cp->sets[set].way_head->useCnt;
-        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
-        {
-            if (blk->useCnt < min)
-                min = blk->useCnt;
-        }
-        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
-        {
-            if (blk->useCnt == min)
-            {
-                repl = blk;
-                break;
-            }
-        }
+       int min;
+
+		for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+		{
+			if (blk->presentCnt == 0)
+			{
+				min = blk->useCnt;
+				break;
+			}
+
+		}
+		
+		for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+		{
+			if (blk->useCnt<min && blk->presentCnt==0)
+			{
+				min = blk->useCnt;
+			}
+		}
+
+		for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+		{
+			if (blk->useCnt==min && blk->presentCnt == 0)
+			{
+				repl= blk;
+				break;
+			}
+		}
     }
     break;
     default:
