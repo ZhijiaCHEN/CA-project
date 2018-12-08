@@ -81,8 +81,6 @@
  * generated (hence the distinction, "functional" simulator).
  */
 
-static int inclusive; //inclusive option, inclusive added.
-
 /* simulated registers */
 static struct regs_t regs;
 
@@ -160,9 +158,9 @@ dl1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void dl1_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    if (inclusive && cache_dl2)
+    if (cache_dl2)
     {
-        printf("sim-cache 165\n");
+        //printf("sim-cache 165\n");
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_dl2, increase, baddr);
     }
@@ -200,8 +198,8 @@ dl2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void dl2_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    printf("sim-cache 203\n");
-    if (inclusive && cache_dl3)
+    //printf("sim-cache 203\n");
+    if (cache_dl3)
     {
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_dl3, increase, baddr);
@@ -260,8 +258,8 @@ il1_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void il1_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    printf("sim-cache 263\n");
-    if (inclusive && cache_il2)
+    //printf("sim-cache 263\n");
+    if (cache_il2)
     {
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_il2, increase, baddr);
@@ -300,8 +298,8 @@ il2_access_fn(enum mem_cmd cmd,        /* access cmd, Read or Write */
 void il2_presence_cnt_fn(int increase,
                          md_addr_t baddr) /* block address to access */
 {
-    printf("sim-cache 303\n");
-    if (inclusive && cache_il3)
+    //printf("sim-cache 303\n");
+    if (cache_il3)
     {
         /* access next level of data cache hierarchy */
         return update_block_present_count(cache_il3, increase, baddr);
@@ -433,7 +431,7 @@ void sim_reg_options(struct opt_odb_t *odb) /* options database */
                  "    <nsets>  - number of sets in the cache\n"
                  "    <bsize>  - block size of the cache\n"
                  "    <assoc>  - associativity of the cache\n"
-                 "    <repl>   - block replacement strategy, 'l'-LRU, 'f'-FIFO, 'r'-random\n"
+                 "    <repl>   - block replacement strategy, 'l'-LRU, 'f'-FIFO, 'r'-random, 'u'-LFU\n"
                  "\n"
                  "    Examples:   -cache:dl1 dl1:4096:32:1:l\n"
                  "                -dtlb dtlb:128:4096:32:r\n");
@@ -476,10 +474,6 @@ void sim_reg_options(struct opt_odb_t *odb) /* options database */
     opt_reg_flag(odb, "-cache:icompress",
                  "convert 64-bit inst addresses to 32-bit inst equivalents",
                  &compress_icache_addrs, /* default */ FALSE,
-                 /* print */ TRUE, NULL);
-    opt_reg_flag(odb, "-inclusive",
-                 "construct inclusive caches",
-                 &inclusive, /* default */ FALSE,
                  /* print */ TRUE, NULL);
 
     opt_reg_string_list(odb, "-pcstat",

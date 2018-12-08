@@ -433,6 +433,8 @@ cache_char2policy(char c) /* replacement policy as a char */
         return Random;
     case 'f':
         return FIFO;
+    case 'u': 
+        return LFU;
     default:
         fatal("bogus replacement policy, `%c'", c);
     }
@@ -450,8 +452,9 @@ void cache_config(struct cache_t *cp, /* cache instance */
             cp->name, cp->assoc,
             cp->policy == LRU ? "LRU"
                               : cp->policy == Random ? "Random"
-                                                     : cp->policy == FIFO ? "FIFO"
-                                                                          : (abort(), ""));
+                              : cp->policy == FIFO ? "FIFO"
+                              : cp->policy == LFU ? "LFU"
+                              : (abort(), ""));
 }
 
 /* register cache stats */
@@ -603,6 +606,23 @@ cache_access(struct cache_t *cp,   /* cache to access */
         int bindex = myrand() & (cp->assoc - 1);
         repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
     }
+    case LFU:// LFU added
+    {   /* Find the least frequently used block*/
+        int min = cp->sets[set].way_head->useCnt;
+        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+        {
+            if (blk->useCnt < min)
+                min = blk->useCnt;
+        }
+        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+        {
+            if (blk->useCnt == min)
+            {
+                repl = blk;
+                break;
+            }
+        }
+    }
     break;
     default:
         panic("bogus replacement policy");
@@ -650,6 +670,7 @@ cache_access(struct cache_t *cp,   /* cache to access */
     repl->tag = tag;
     repl->status = CACHE_BLK_VALID; /* dirty bit set on update */
     repl->presentCnt = 0; /* reset present count. INCLUSIVE added. */
+    repl->useCnt = 0; /* reset use count. LFU added. */
 
     /* read data block */
     lat += cp->blk_access_fn(Read, CACHE_BADDR(cp, addr), cp->bsize,
@@ -705,6 +726,12 @@ cache_hit: /* slow hit handler */
         update_way_list(&cp->sets[set], blk, Head);
     }
 
+    /* if LFU replacement */
+    if (cp->policy == LFU)
+    {
+        blk->useCnt++;
+    }
+
     /* tag is unchanged, so hash links (if they exist) are still valid */
 
     /* record the last block to hit */
@@ -732,6 +759,12 @@ cache_fast_hit: /* fast hit handler */
     /* update dirty status */
     if (cmd == Write)
         blk->status |= CACHE_BLK_DIRTY;
+
+    /* if LFU replacement */
+    if (cp->policy == LFU)
+    {
+        blk->useCnt++;
+    }
 
     /* this block hit last, no change in the way list */
 
@@ -761,17 +794,17 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
     /* check for a fast hit: access to same block */
     if (CACHE_TAGSET(cp, addr) == cp->last_tagset && cp->last_blk)
     {
-        printf("cache 763, current addr: %d, last_blk: %p\n", addr, cp->last_blk);
+        //printf("cache 763, current addr: %d, last_blk: %p\n", addr, cp->last_blk);
         /* hit in the same block */
         blk = cp->last_blk;
         blk->presentCnt += increase;
-        printf("block address %d count after update: %d\n", addr, blk->presentCnt);
+        //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
         return;
     }
 
     if (cp->hsize)
     {
-        printf("cache 773\n");
+        //printf("cache 773\n");
         /* higly-associativity cache, access through the per-set hash tables */
         int hindex = CACHE_HASH(cp, tag);
 
@@ -782,7 +815,7 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
             {
                 blk->presentCnt += increase;
-                printf("block address %d count after update: %d\n", addr, blk->presentCnt);
+                //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
                 return;
             }
         }
@@ -798,14 +831,14 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
             {
                 blk->presentCnt += increase;
-                printf("block address %d count after update: %d\n", addr, blk->presentCnt);
+                //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
                 return;
             }
         }
     }
 
     /* cache block not found */
-    printf("%s misses a block present in upper level cache!\n", cp->name);
+    //printf("%s misses a block present in upper level cache!\n", cp->name);
     return;
 }
 

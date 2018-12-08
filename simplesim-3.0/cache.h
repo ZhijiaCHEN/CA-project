@@ -102,7 +102,8 @@ enum cache_policy
 {
     LRU,    /* replace least recently used block (perfect LRU) */
     Random, /* replace a random block */
-    FIFO    /* replace the oldest block in the set */
+    FIFO,    /* replace the oldest block in the set */
+    LFU		/* replace least frequently used block, LFU added */
 };
 
 /* block status values */
@@ -131,7 +132,7 @@ struct cache_blk_t
     byte_t data[1]; /* actual data block starts here, block size
 				   should probably be a multiple of 8 */
     unsigned int presentCnt;
-    unsigned int useCnt;
+    unsigned int useCnt; /* Used in LFU replacement, increase by 1 if cache block hit, LFU added */
     char presentFlag; /* suppose the block size of upper level cache is no less than 1/8 of the block size of current cache, presentFlag tells which part of current block is present in upper level cache. For example, if current block size is 64B and the upper level cache block size is 8B, then binary 00000000 means no data of current block is present in the upper level cache, and binary 00010000 means 8B data of current block is present in the upper level cache which starting at the offset 4*8 = 64. */
 };
 
