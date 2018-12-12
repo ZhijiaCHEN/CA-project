@@ -61,6 +61,13 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <pthread.h>
+#include <sys/mman.h>
 
 #include "host.h"
 #include "misc.h"
@@ -995,6 +1002,60 @@ void sim_main(void)
     enum md_opcode op;
     register int is_write;
     enum md_fault_type fault;
+    int shmid;
+    //key_t key = ftok("cache shared memory", 65);
+
+    shmid = shmget(IPC_PRIVATE,1024,0666|IPC_CREAT);
+    char *ptr = (char*)shmat(shmid, NULL, 0);
+    sprintf(ptr, "hello from before creating childe.\n");
+    pid_t pid = fork();
+    int status;
+    unsigned int *core1Cnt = (unsigned int *)ptr, *core2Cnt = ((unsigned int*)ptr+1);
+    int *data = ((int*)ptr+2);
+    pthread_mutex_t *mutex = (pthread_mutex_t*)((int*)ptr + 3);
+    pthread_mutexattr_t *mutexattr = (pthread_mutexattr_t *)((char*)mutex + sizeof(pthread_mutex_t));
+
+    pthread_mutexattr_init(mutexattr);
+    pthread_mutexattr_setpshared(mutexattr, PTHREAD_PROCESS_SHARED);
+
+    pthread_mutex_init(mutex, mutexattr);
+    *core1Cnt = 0;
+    *core2Cnt = 0;
+    *data = 0;
+    if (pid == 0)
+    {
+        while(*core1Cnt < 10)
+        {
+            while(*core1Cnt > *core2Cnt) ;
+            ++(*core1Cnt);
+            pthread_mutex_lock(mutex);
+            ++(*data);
+            printf("child cnt = %u, data = %d\n", *core1Cnt, *data);
+            pthread_mutex_unlock(mutex);
+        }
+        //printf("child process is going to write shared memory\n");
+        //sprintf(ptr, "hello from child.\n");
+        exit(0);
+    }
+    else
+    {
+        while(*core2Cnt < 10)
+        {
+            while(*core1Cnt <= *core2Cnt) ;
+            ++(*core2Cnt);
+            pthread_mutex_lock(mutex);
+            --(*data);
+            printf("parent cnt = %u, data = %d\n", *core2Cnt, *data);
+            pthread_mutex_unlock(mutex);
+        }
+        wait(&status);
+        printf("child exit status: %d, parent read shared memory: %s\n", status, ptr);
+        pthread_mutex_destroy(mutex);
+        pthread_mutexattr_destroy(mutexattr);
+        shmdt(ptr);
+        shmctl(shmid,IPC_RMID,NULL);
+    }
+
 
     fprintf(stderr, "sim: ** starting functional simulation w/ caches **\n");
 
