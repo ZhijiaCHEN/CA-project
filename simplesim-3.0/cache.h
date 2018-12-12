@@ -52,6 +52,13 @@
 #define CACHE_H
 
 #include <stdio.h>
+/* MULTICORE begin */
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <unistd.h>
+/* MULTICORE end */
 
 #include "host.h"
 #include "misc.h"
@@ -177,8 +184,18 @@ struct cache_t
                          struct cache_blk_t *blk, /* ptr to cache block struct */
                          tick_t now);             /* when fetch was initiated */
 
-    void (*blk_present_fn)(int increase,       /* increase present count? */
+    /* block present count update handler. INCLUSIVE added. */
+    void (*blk_present_fn)(int increase,       /* increase the present count (this argument can only be 1 or -1) */
                            md_addr_t addr);    /* address of access */
+    
+    /* MULTICORE modification start. */
+    int shared; // cache shared flag, 1 for shared, otherwise private
+    int shmid; // shared memeory id
+    
+    pthread_mutex_t mutex; 
+    pthread_mutexattr_t mutexattr;
+    /* MULTICORE mostification end. */
+
     /* derived data, for fast decoding */
     int hsize; /* cache set hash table size */
     md_addr_t blk_mask;
@@ -225,6 +242,7 @@ cache_create(char *name,               /* name of the cache */
              int balloc,               /* allocate data space for blocks? */
              int usize,                /* size of user data to alloc w/blks */
              int assoc,                /* associativity of cache */
+             int shared,                /* 1 for shared cache, otherwise private. MULTICORE added */
              enum cache_policy policy, /* replacement policy w/in sets */
              /* block access function, see description w/in struct cache def */
              unsigned int (*blk_access_fn)(enum mem_cmd cmd,

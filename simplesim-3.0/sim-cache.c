@@ -67,7 +67,6 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <pthread.h>
-#include <sys/mman.h>
 
 #include "host.h"
 #include "misc.h"
@@ -519,7 +518,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                    name, &nsets, &bsize, &assoc, &c) != 5)
             fatal("bad l1 D-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
         cache_dl1 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                 /* usize */ 0, assoc, cache_char2policy(c),
+                                 /* usize */ 0, assoc, /* private cache, MULTICOORE added */ 0, cache_char2policy(c),
                                  dl1_access_fn, dl1_presence_cnt_fn, /* hit latency */ 1);
 
         /* is the level 2 D-cache defined? */
@@ -541,7 +540,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                 fatal("bad l2 D-cache parms: "
                       "<name>:<nsets>:<bsize>:<assoc>:<repl>");
             cache_dl2 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                     /* usize */ 0, assoc, cache_char2policy(c),
+                                     /* usize */ 0, assoc, /* private cache, MULTICOORE added */ 0, cache_char2policy(c),
                                      dl2_access_fn, dl2_presence_cnt_fn, /* hit latency */ 1);
 
             // LVL3 Added (BEGIN): Level 3 data cache creation.
@@ -555,7 +554,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                     fatal("bad l3 D-cache parms: "
                           "<name>:<nsets>:<bsize>:<assoc>:<repl>");
                 cache_dl3 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                         /* usize */ 0, assoc, cache_char2policy(c),
+                                         /* usize */ 0, assoc, /* shared cache, MULTICOORE added */ 1, cache_char2policy(c),
                                          dl3_access_fn, dl3_presence_cnt_fn, /* hit latency */ 1);
             }
             // LVL3 Added (END)
@@ -629,7 +628,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                    name, &nsets, &bsize, &assoc, &c) != 5)
             fatal("bad l1 I-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
         cache_il1 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                 /* usize */ 0, assoc, cache_char2policy(c),
+                                 /* usize */ 0, assoc, /* private cache, MULTICOORE added */ 0, cache_char2policy(c),
                                  il1_access_fn, il1_presence_cnt_fn, /* hit latency */ 1);
 
         /* is the level 2 D-cache defined? */
@@ -672,7 +671,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                 fatal("bad l2 I-cache parms: "
                       "<name>:<nsets>:<bsize>:<assoc>:<repl>");
             cache_il2 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                     /* usize */ 0, assoc, cache_char2policy(c),
+                                     /* usize */ 0, assoc, /* private cache, MULTICOORE added */ 0, cache_char2policy(c),
                                      il2_access_fn, il2_presence_cnt_fn, /* hit latency */ 1);
 
             // LVL3 Added (BEGIN): Level 3 instruction cache creation.
@@ -692,7 +691,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
                     fatal("bad l3 I-cache parms: "
                           "<name>:<nsets>:<bsize>:<assoc>:<repl>");
                 cache_il3 = cache_create(name, nsets, bsize, /* balloc */ FALSE,
-                                         /* usize */ 0, assoc, cache_char2policy(c),
+                                         /* usize */ 0, assoc, /* shared cache, MULTICOORE added */ 1, cache_char2policy(c),
                                          il3_access_fn, il3_presence_cnt_fn, /* hit latency */ 1);
             }
             // LVL3 Added (END)
@@ -710,6 +709,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
         itlb = cache_create(name, nsets, bsize, /* balloc */ FALSE,
                             /* usize */ sizeof(md_addr_t),
                             assoc,
+                            /* private cache, MULTICOORE added */ 0, 
                             cache_char2policy(c),
                             itlb_access_fn,
                             tlb_presence_cnt_fn,
@@ -727,6 +727,7 @@ void sim_check_options(struct opt_odb_t *odb, /* options database */
         dtlb = cache_create(name, nsets, bsize, /* balloc */ FALSE,
                             /* usize */ sizeof(md_addr_t),
                             assoc,
+                            /* private cache, MULTICOORE added */ 0, 
                             cache_char2policy(c),
                             dtlb_access_fn,
                             tlb_presence_cnt_fn,
@@ -1002,62 +1003,20 @@ void sim_main(void)
     enum md_opcode op;
     register int is_write;
     enum md_fault_type fault;
-    int shmid;
-    //key_t key = ftok("cache shared memory", 65);
 
-    shmid = shmget(IPC_PRIVATE,1024,0666|IPC_CREAT);
-    char *ptr = (char*)shmat(shmid, NULL, 0);
-    sprintf(ptr, "hello from before creating childe.\n");
-    pid_t pid = fork();
+    /* initialize synchronization variables for two simulation process. MULTICORE modification begin. */
+    int shmid = shmget(IPC_PRIVATE, 2*sizeof(size_t), 0666 | IPC_CREAT);
+    size_t *syncCnt = (size_t*)shmat(shmid, NULL, 0); // variables that help to synchronize instruction execution between two processes.  
     int status;
-    unsigned int *core1Cnt = (unsigned int *)ptr, *core2Cnt = ((unsigned int*)ptr+1);
-    int *data = ((int*)ptr+2);
-    //pthread_mutex_t *mutex = (pthread_mutex_t*)((int*)ptr + 3);
-    //pthread_mutexattr_t *mutexattr = (pthread_mutexattr_t *)((char*)mutex + sizeof(pthread_mutex_t));
-
-    pthread_mutex_t mutex;
+    pthread_mutex_t mutex; // mutex for shared memory access
     pthread_mutexattr_t mutexattr;
     pthread_mutexattr_init(&mutexattr);
     pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
-
     pthread_mutex_init(&mutex, &mutexattr);
-    *core1Cnt = 0;
-    *core2Cnt = 0;
-    *data = 0;
-    if (pid == 0)
-    {
-        while(*core1Cnt < 10)
-        {
-            while(*core1Cnt > *core2Cnt) ;
-            pthread_mutex_lock(&mutex);
-            ++(*data);
-            ++(*core1Cnt);
-            printf("child cnt = %u, data = %d\n", *core1Cnt, *data);
-            pthread_mutex_unlock(&mutex);
-        }
-        //printf("child process is going to write shared memory\n");
-        //sprintf(ptr, "hello from child.\n");
-        exit(0);
-    }
-    else
-    {
-        while(*core2Cnt < 10)
-        {
-            while(*core1Cnt <= *core2Cnt) ;
-            pthread_mutex_lock(&mutex);
-            --(*data);
-            ++(*core2Cnt);
-            printf("parent cnt = %u, data = %d\n", *core2Cnt, *data);
-            pthread_mutex_unlock(&mutex);
-        }
-        wait(&status);
-        printf("child exit status: %d, parent read shared memory: %s\n", status, ptr);
-        pthread_mutex_destroy(&mutex);
-        pthread_mutexattr_destroy(&mutexattr);
-        shmdt(ptr);
-        shmctl(shmid,IPC_RMID,NULL);
-    }
-
+    syncCnt[0] = 0;
+    syncCnt[1] = 0;
+    pid_t pid = fork();
+    /* MULTICORE modification end. */
 
     fprintf(stderr, "sim: ** starting functional simulation w/ caches **\n");
 
@@ -1068,7 +1027,7 @@ void sim_main(void)
     if (dlite_check_break(regs.regs_PC, /* no access */ 0, /* addr */ 0, 0, 0))
         dlite_main(regs.regs_PC - sizeof(md_inst_t), regs.regs_PC,
                    sim_num_insn, &regs, mem);
-    //printf("dl1 %p\ndl2 %p\ndl3 %p\nil1 %p\nil2 %p\nil3 %p\n", dl1_presence_cnt_fn, dl2_presence_cnt_fn, dl3_presence_cnt_fn, il1_presence_cnt_fn, il2_presence_cnt_fn, il3_presence_cnt_fn);
+
     while (TRUE)
     {
         /* maintain $r0 semantics */
@@ -1152,7 +1111,8 @@ void sim_main(void)
         if (dlite_check_break(regs.regs_NPC,
                               is_write ? ACCESS_WRITE : ACCESS_READ,
                               addr, sim_num_insn, sim_num_insn))
-            dlite_main(regs.regs_PC, regs.regs_NPC, sim_num_insn, &regs, mem);
+                                dlite_main(regs.regs_PC, regs.regs_NPC, sim_num_insn, &regs, mem);              
+            
 
         /* go to the next instruction */
         regs.regs_PC = regs.regs_NPC;
@@ -1161,5 +1121,18 @@ void sim_main(void)
         /* finish early? */
         if (max_insts && sim_num_insn >= max_insts)
             return;
+
+        /* synchronize two core processes. MULTICORE modification begin. */
+        if(pid != 0)// parent process, denote it as core 1 process
+        {
+            while(syncCnt[0] > syncCnt[1]) ;//wait for core 2 process to follow up
+            ++syncCnt[0];
+        }
+        else// child process, denote it as core 2 porcess
+        {
+            while(syncCnt[0] == syncCnt[1]) ;//wait for core 1 process to proceed
+            ++syncCnt[1];
+        }
+        /* MULTICORE modification end. */
     }
 }

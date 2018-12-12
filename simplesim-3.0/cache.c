@@ -278,6 +278,7 @@ cache_create(char *name,               /* name of the cache */
              int balloc,               /* allocate data space for blocks? */
              int usize,                /* size of user data to alloc w/blks */
              int assoc,                /* associativity of cache */
+             int shared,                /* 1 for shared cache, otherwise private. MULTICORE added */
              enum cache_policy policy, /* replacement policy w/in sets */
              /* block access function, see description w/in struct cache def */
              unsigned int (*blk_access_fn)(enum mem_cmd cmd,
@@ -311,11 +312,34 @@ cache_create(char *name,               /* name of the cache */
     if (!blk_access_fn)
         fatal("must specify miss/replacement functions");
 
-    /* allocate the cache structure */
-    cp = (struct cache_t *)
-        calloc(1, sizeof(struct cache_t) + (nsets - 1) * sizeof(struct cache_set_t));
-    if (!cp)
-        fatal("out of virtual memory");
+    /* allocate the cache structure either using dynamic memory (private cache or shared memory (shared cache). MULTICORE modification begin.*/
+    size_t cacheSize = sizeof(struct cache_t) + (nsets - 1) * sizeof(struct cache_set_t);
+    int shmid;
+    if (shared != 1) // private cache
+    {
+        cp = (struct cache_t *)
+                calloc(1, cacheSize);
+        if (!cp)
+            fatal("Dynamic memory allocation failed.");
+        printf("creating private cache %s in process %d\n", name, getpid());
+    }
+    else // shared cache
+    {
+        shmid = shmget(IPC_PRIVATE, cacheSize, 0666|IPC_CREAT);
+        cp = (struct cache_t *)
+                shmat(shmid, NULL, 0);
+        if (!cp)
+            fatal("Shared memory allocation failed.");
+        
+        memset(cp, 0, cacheSize);
+        cp->shmid = shmid;
+        pthread_mutexattr_init(&cp->mutexattr);
+        pthread_mutexattr_setpshared(&cp->mutexattr, PTHREAD_PROCESS_SHARED);
+        pthread_mutex_init(&cp->mutex, &cp->mutexattr);
+        printf("creating shared cache %s in process %d\n", name, getpid());
+    }
+    cp->shared = shared; 
+    /* MULTICORE modification end. */
 
     /* initialize user parameters */
     cp->name = mystrdup(name);
@@ -538,6 +562,10 @@ cache_access(struct cache_t *cp,   /* cache to access */
     struct cache_blk_t *blk, *repl;
     int lat = 0;
 
+    /* lock cache if shared. MULTICORE added. */
+    if (cp->shared == 1)
+        pthread_mutex_lock(&cp->mutex);
+
     /* default replacement address */
     if (repl_addr)
         *repl_addr = 0;
@@ -681,8 +709,9 @@ cache_access(struct cache_t *cp,   /* cache to access */
                                      cp->bsize, repl, now + lat);
         }
 
-        /* update presence count */
-        cp->blk_present_fn(-1, CACHE_MK_BADDR(cp, repl->tag, set));
+        /* update presence count, INCLUSIVE added */
+        if (cp->policy == LFU)
+            cp->blk_present_fn(-1, CACHE_MK_BADDR(cp, repl->tag, set));
     }
 
     /* update block tags */
@@ -695,9 +724,9 @@ cache_access(struct cache_t *cp,   /* cache to access */
     lat += cp->blk_access_fn(Read, CACHE_BADDR(cp, addr), cp->bsize,
                              repl, now + lat);
 
-    /* update presence count */
-    //printf("657 blk_present_fn address %p\n", cp->blk_present_fn);
-    cp->blk_present_fn(1, CACHE_BADDR(cp, addr));
+    /* update presence count, INCLUSIVE added */
+    if (cp->policy == LFU)
+        cp->blk_present_fn(1, CACHE_BADDR(cp, addr));
 
     /* copy data out of cache block */
     if (cp->balloc)
@@ -719,6 +748,10 @@ cache_access(struct cache_t *cp,   /* cache to access */
     /* link this entry back into the hash table */
     if (cp->hsize)
         link_htab_ent(cp, &cp->sets[set], repl);
+
+    /* unlock cache before return if shared. MULTICORE added. */
+    if (cp->shared == 1)
+        pthread_mutex_unlock(&cp->mutex);
 
     /* return latency of the operation */
     return lat;
@@ -761,6 +794,10 @@ cache_hit: /* slow hit handler */
     if (udata)
         *udata = blk->user_data;
 
+    /* unlock cache before return if shared. MULTICORE added. */
+    if (cp->shared == 1)
+        pthread_mutex_unlock(&cp->mutex);
+
     /* return first cycle data is available to access */
     return (int)MAX(cp->hit_latency, (blk->ready - now));
 
@@ -797,11 +834,16 @@ cache_fast_hit: /* fast hit handler */
     cp->last_tagset = CACHE_TAGSET(cp, addr);
     cp->last_blk = blk;
 
+    /* unlock cache before return if shared. MULTICORE added. */
+    if (cp->shared == 1)
+        pthread_mutex_unlock(&cp->mutex);
+
     /* return first cycle data is available to access */
     return (int)MAX(cp->hit_latency, (blk->ready - now));
 }
 
-/* Update the block present count. When a upper level cacheblock is loaded into/evicted from a cache, we increase/decrease the present count of the lower level cache block where the upper level cache block is read from. */
+/* Update the block present count. INCLUSIVE added.
+** When a upper level cacheblock is loaded into/evicted from a cache, we increase/decrease the present count of the lower level cache block where the upper level cache block is read from. */
 void update_block_present_count(struct cache_t *cp, /* cache where the block belongs to */
                                 int increase,       /* increase present count? */
                                 md_addr_t addr)     /* address of access */
@@ -810,6 +852,11 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
     md_addr_t tag = CACHE_TAG(cp, addr);
     md_addr_t set = CACHE_SET(cp, addr);
     struct cache_blk_t *blk;
+
+    /* lock cache if shared. MULTICORE added. */
+    if (cp->shared == 1)
+        pthread_mutex_lock(&cp->mutex);
+
     /* check for a fast hit: access to same block */
     if (CACHE_TAGSET(cp, addr) == cp->last_tagset && cp->last_blk)
     {
@@ -818,6 +865,9 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
         blk = cp->last_blk;
         blk->presentCnt += increase;
         //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
+        /* unlock cache before return if shared. MULTICORE added. */
+        if (cp->shared == 1)
+            pthread_mutex_unlock(&cp->mutex);
         return;
     }
 
@@ -835,6 +885,9 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             {
                 blk->presentCnt += increase;
                 //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
+                /* unlock cache before return if shared. MULTICORE added. */
+                if (cp->shared == 1)
+                    pthread_mutex_unlock(&cp->mutex);
                 return;
             }
         }
@@ -851,13 +904,20 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             {
                 blk->presentCnt += increase;
                 //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
+                
+                /* unlock cache before return if shared. MULTICORE added. */
+                if (cp->shared == 1)
+                    pthread_mutex_unlock(&cp->mutex);
                 return;
             }
         }
     }
 
     /* cache block not found */
-    //printf("%s misses a block present in upper level cache!\n", cp->name);
+    panic("%s misses a block present in upper level cache!\n", cp->name);
+    /* unlock cache before return if shared. MULTICORE added. */
+    if (cp->shared == 1)
+        pthread_mutex_unlock(&cp->mutex);
     return;
 }
 
