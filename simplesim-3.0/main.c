@@ -63,7 +63,12 @@
 #ifdef BFD_LOADER
 #include <bfd.h>
 #endif /* BFD_LOADER */
-
+/* MULTICORE begin */
+#include <pthread.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
+/* MULTICORE end */
 #include "host.h"
 #include "misc.h"
 #include "machine.h"
@@ -74,6 +79,11 @@
 #include "stats.h"
 #include "loader.h"
 #include "sim.h"
+
+/* mutex for outputs. MULTICORE added. */
+pthread_mutex_t *mutexPrint; 
+pthread_mutexattr_t *mutexPrintAttr;
+
 
 /* stats signal handler */
 static void
@@ -204,32 +214,46 @@ sim_print_stats(FILE *fd)		/* output stream */
   sim_mem_usage = (sbrk(0) - &etext) / 1024;
 #endif
 
-  /* print simulation stats */
-  fprintf(fd, "\nsim: ** simulation statistics **\n");
-  stat_print_stats(sim_sdb, fd);
-  sim_aux_stats(fd);
-  fprintf(fd, "\n");
+    /* print simulation stats */
+    pthread_mutex_lock(mutexPrint); // MULTICORE added.
+    fprintf(fd, "\nsim: ** simulation statistics from core process %d**\n", getpid());
+    stat_print_stats(sim_sdb, fd);
+    sim_aux_stats(fd);
+    fprintf(fd, "\n");
+    pthread_mutex_unlock(mutexPrint); // MULTICORE added.
+
 }
 
 /* print stats, uninitialize simulator components, and exit w/ exitcode */
 static void
 exit_now(int exit_code)
 {
+    /* end synchronization. MULTICORE added. */
+    sim_sync_end();
+
   /* print simulation stats */
   sim_print_stats(stderr);
 
   /* un-initialize the simulator */
   sim_uninit();
-
+    wait(NULL);
   /* all done! */
   exit(exit_code);
 }
 
-int
 main(int argc, char **argv, char **envp)
 {
-  char *s;
-  int i, exit_code;
+    char *s;
+    int i, exit_code;
+
+    /* initialize output mutex. MULTICORE modification starts. */
+    char *printMutexShm = (char *)shmat(shmget(IPC_PRIVATE, sizeof(pthread_mutex_t)+sizeof(pthread_mutexattr_t), 0666 | IPC_CREAT), NULL, 0);
+    mutexPrint = (pthread_mutex_t*)printMutexShm;
+    mutexPrintAttr = (pthread_mutexattr_t*)(printMutexShm + sizeof(pthread_mutex_t));
+    if(pthread_mutexattr_init(mutexPrintAttr) != 0) fatal("mutex attributes init failed./n");
+    if(pthread_mutexattr_setpshared(mutexPrintAttr, PTHREAD_PROCESS_SHARED) != 0)  fatal("mutex set shared failed./n");
+    if(pthread_mutex_init(mutexPrint, mutexPrintAttr) != 0)  fatal("mutex init failed./n");
+    /* MULTICORE modification end. */
 
 #ifndef _MSC_VER
   /* catch SIGUSR1 and dump intermediate stats */
@@ -377,8 +401,12 @@ main(int argc, char **argv, char **envp)
   /* initialize all simulation modules */
   sim_init();
 
-  /* initialize architected state */
-  sim_load_prog(argv[exec_index], argc-exec_index, argv+exec_index, envp);
+    /* duplicate core process. MULTICORE added. */
+    sim_dup_core();
+
+    /* initialize architected state */
+    sim_load_prog(argv[exec_index], argc-exec_index, argv+exec_index, envp);
+        
 
   /* register all simulator stats */
   sim_sdb = stat_new();

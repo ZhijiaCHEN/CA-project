@@ -138,4 +138,10 @@ void sim_uninit(void);
 void
 sim_print_stats(FILE *fd);		/* output stream */
 
+/* fork a new process as second core. MULTICORE added. */
+void sim_dup_core(void);
+
+/* end synchronization by setting the syncCnt to maximum value. MULTICORE added. */
+void sim_sync_end(void);
+
 #endif /* SIM_H */

@@ -123,6 +123,10 @@ static struct cache_t *itlb = NULL;
 /* data TLB */
 static struct cache_t *dtlb = NULL;
 
+static pid_t pid; //MULTICORE added
+
+static size_t *syncCnt; // variables that help to synchronize instruction execution between two processes. MULTICORE added
+
 /* text-based stat profiles */
 #define MAX_PCSTAT_VARS 10 // LVL3 Modified: Increased from 8 to 10.
 static struct stat_stat_t *pcstat_stats[MAX_PCSTAT_VARS];
@@ -767,6 +771,33 @@ void sim_load_prog(char *fname,           /* program to load */
                    int argc, char **argv, /* program arguments */
                    char **envp)           /* program environment */
 {
+    /* parse the second input program if exits. MULTICORE begin. */
+    int prog2Idx = 0;
+
+    while(prog2Idx < argc)
+    {
+        if(argv[prog2Idx][0] == ':')
+        {
+            ++prog2Idx;
+            break;
+        }
+        ++prog2Idx;
+    }
+    prog2Idx = prog2Idx % argc;
+
+    if (pid != 0)
+    {   
+        argc = prog2Idx == 0 ? argc : (prog2Idx - 1);
+        //printf("pgrogram 1: %s, arg count = %d \n", *argv, argc);
+    }
+    else
+    {
+        argc -= prog2Idx;
+        argv += prog2Idx;
+        //printf("pgrogram 2: %s, arg count = %d \n", *argv, argc);
+    }
+    /* MULTICORE ends. */
+
     /* load program text and data, set up environment, memory, and regs */
     ld_load_prog(fname, argc, argv, envp, &regs, mem, TRUE);
 
@@ -985,6 +1016,45 @@ dcache_access_fn(struct mem_t *mem, /* memory space to access */
     return mem_access(mem, cmd, addr, p, nbytes);
 }
 
+/* varibles used for synchronization. MULTICORE begin.
+
+size_t *syncCnt;
+pthread_mutex_t &syncMutex; // mutex for shared memory access
+pthread_mutexattr_t &syncMutexAttr;
+MULTICORE end. */
+
+/* initialize variables to synchronize between two processes. MULTICORE added.
+void synch_init()
+{
+      
+    syncMutex = (pthread_mutex_t *)shmat(shmget(IPC_PRIVATE, sizeof(pthread_mutex_t), 0666 | IPC_CREAT);, NULL, 0);
+    syncMutexAttr = (pthread_mutexattr_t *)shmat(shmget(IPC_PRIVATE, sizeof(pthread_mutexattr_t), 0666 | IPC_CREAT);, NULL, 0);
+    pthread_mutexattr_init(&syncMutexAttr);
+    pthread_mutexattr_setpshared(&syncMutexAttr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&syncMutex, &syncMutexAttr);  
+} */
+
+/* fork a new process as second core. MULTICORE added. */
+void sim_dup_core(void)
+{
+    syncCnt = (size_t*)shmat(shmget(IPC_PRIVATE, 2*sizeof(size_t), 0666 | IPC_CREAT), NULL, 0);
+    syncCnt[0] = 0;
+    syncCnt[1] = 0;
+    pid = fork();
+}
+
+/* end synchronization by setting the syncCnt to maximum value. MULTICORE added. */
+void sim_sync_end(void)
+{
+    if(pid != 0)
+    {
+        syncCnt[0] = __UINT32_MAX__;
+    }
+    else
+    {
+        syncCnt[1] = __UINT32_MAX__;
+    }
+}
 /* system call handler macro */
 #define SYSCALL(INST)                                        \
     (flush_on_syscalls                                       \
@@ -1003,20 +1073,6 @@ void sim_main(void)
     enum md_opcode op;
     register int is_write;
     enum md_fault_type fault;
-
-    /* initialize synchronization variables for two simulation process. MULTICORE modification begin. */
-    int shmid = shmget(IPC_PRIVATE, 2*sizeof(size_t), 0666 | IPC_CREAT);
-    size_t *syncCnt = (size_t*)shmat(shmid, NULL, 0); // variables that help to synchronize instruction execution between two processes.  
-    int status;
-    pthread_mutex_t mutex; // mutex for shared memory access
-    pthread_mutexattr_t mutexattr;
-    pthread_mutexattr_init(&mutexattr);
-    pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
-    pthread_mutex_init(&mutex, &mutexattr);
-    syncCnt[0] = 0;
-    syncCnt[1] = 0;
-    pid_t pid = fork();
-    /* MULTICORE modification end. */
 
     fprintf(stderr, "sim: ** starting functional simulation w/ caches **\n");
 
@@ -1130,7 +1186,7 @@ void sim_main(void)
         }
         else// child process, denote it as core 2 porcess
         {
-            while(syncCnt[0] == syncCnt[1]) ;//wait for core 1 process to proceed
+            while(syncCnt[0] <= syncCnt[1]) ;//wait for core 1 process to proceed
             ++syncCnt[1];
         }
         /* MULTICORE modification end. */
