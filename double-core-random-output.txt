@@ -1,0 +1,120 @@
+sim: ** simulation statistics from core process 3101**
+sim_num_insn               40905687 # total number of instructions executed
+sim_num_refs               12494318 # total number of loads and stores executed
+sim_elapsed_time                  5 # total simulation time in seconds
+sim_inst_rate          8181137.4000 # simulation speed (in insts/sec)
+il1.accesses               40905687 # total number of accesses
+il1.hits                   40905451 # total number of hits
+il1.misses                      236 # total number of misses
+il1.replacements                130 # total number of replacements
+il1.writebacks                    0 # total number of writebacks
+il1.invalidations                 0 # total number of invalidations
+il1.miss_rate                0.0000 # miss rate (i.e., misses/ref)
+il1.repl_rate                0.0000 # replacement rate (i.e., repls/ref)
+il1.wb_rate                  0.0000 # writeback rate (i.e., wrbks/ref)
+il1.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+dl1.accesses               12494388 # total number of accesses
+dl1.hits                   11915177 # total number of hits
+dl1.misses                   579211 # total number of misses
+dl1.replacements             579083 # total number of replacements
+dl1.writebacks               568299 # total number of writebacks
+dl1.invalidations                 0 # total number of invalidations
+dl1.miss_rate                0.0464 # miss rate (i.e., misses/ref)
+dl1.repl_rate                0.0463 # replacement rate (i.e., repls/ref)
+dl1.wb_rate                  0.0455 # writeback rate (i.e., wrbks/ref)
+dl1.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+ul2.accesses                1147746 # total number of accesses
+ul2.hits                     680488 # total number of hits
+ul2.misses                   467258 # total number of misses
+ul2.replacements             466234 # total number of replacements
+ul2.writebacks               464904 # total number of writebacks
+ul2.invalidations                 0 # total number of invalidations
+ul2.miss_rate                0.4071 # miss rate (i.e., misses/ref)
+ul2.repl_rate                0.4062 # replacement rate (i.e., repls/ref)
+ul2.wb_rate                  0.4051 # writeback rate (i.e., wrbks/ref)
+ul2.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+ul3.accesses                1016058 # total number of accesses
+ul3.hits                    1010086 # total number of hits
+ul3.misses                     5973 # total number of misses
+ul3.replacements                107 # total number of replacements
+ul3.writebacks                   63 # total number of writebacks
+ul3.invalidations                 0 # total number of invalidations
+ul3.miss_rate                0.0059 # miss rate (i.e., misses/ref)
+ul3.repl_rate                0.0001 # replacement rate (i.e., repls/ref)
+ul3.wb_rate                  0.0001 # writeback rate (i.e., wrbks/ref)
+ul3.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+ld_text_base             0x00400000 # program text (code) segment base
+ld_text_size                  25984 # program text (code) size in bytes
+ld_data_base             0x10000000 # program initialized data segment base
+ld_data_size                 401312 # program init'ed `.data' and uninit'ed `.bss' size in bytes
+ld_stack_base            0x7fffc000 # program stack segment base (highest address in stack)
+ld_stack_size                 16384 # program initial stack size
+ld_prog_entry            0x00400140 # program entry point (initial PC)
+ld_environ_base          0x7fff8000 # program environment base address address
+ld_target_big_endian              0 # target executable endian-ness, non-zero if big endian
+mem.page_count                  111 # total number of pages allocated
+mem.page_mem                   444k # total size of memory pages allocated
+mem.ptab_misses                 210 # total first level page table misses
+mem.ptab_accesses         188775877 # total page table accesses
+mem.ptab_miss_rate           0.0000 # first level page table miss rate
+
+
+sim: ** simulation statistics from core process 3100**
+sim_num_insn             1823262177 # total number of instructions executed
+sim_num_refs              517354119 # total number of loads and stores executed
+sim_elapsed_time                 99 # total simulation time in seconds
+sim_inst_rate          18416789.6667 # simulation speed (in insts/sec)
+il1.accesses             1823262177 # total number of accesses
+il1.hits                 1823261930 # total number of hits
+il1.misses                      247 # total number of misses
+il1.replacements                131 # total number of replacements
+il1.writebacks                    0 # total number of writebacks
+il1.invalidations                 0 # total number of invalidations
+il1.miss_rate                0.0000 # miss rate (i.e., misses/ref)
+il1.repl_rate                0.0000 # replacement rate (i.e., repls/ref)
+il1.wb_rate                  0.0000 # writeback rate (i.e., wrbks/ref)
+il1.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+dl1.accesses              517354205 # total number of accesses
+dl1.hits                  484852001 # total number of hits
+dl1.misses                 32502204 # total number of misses
+dl1.replacements           32502076 # total number of replacements
+dl1.writebacks              2260610 # total number of writebacks
+dl1.invalidations                 0 # total number of invalidations
+dl1.miss_rate                0.0628 # miss rate (i.e., misses/ref)
+dl1.repl_rate                0.0628 # replacement rate (i.e., repls/ref)
+dl1.wb_rate                  0.0044 # writeback rate (i.e., wrbks/ref)
+dl1.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+ul2.accesses               34763061 # total number of accesses
+ul2.hits                   31721376 # total number of hits
+ul2.misses                  3041685 # total number of misses
+ul2.replacements            3040661 # total number of replacements
+ul2.writebacks               184377 # total number of writebacks
+ul2.invalidations                 0 # total number of invalidations
+ul2.miss_rate                0.0875 # miss rate (i.e., misses/ref)
+ul2.repl_rate                0.0875 # replacement rate (i.e., repls/ref)
+ul2.wb_rate                  0.0053 # writeback rate (i.e., wrbks/ref)
+ul2.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+ul3.accesses                4158222 # total number of accesses
+ul3.hits                    4152143 # total number of hits
+ul3.misses                     6079 # total number of misses
+ul3.replacements                158 # total number of replacements
+ul3.writebacks                  112 # total number of writebacks
+ul3.invalidations                 0 # total number of invalidations
+ul3.miss_rate                0.0015 # miss rate (i.e., misses/ref)
+ul3.repl_rate                0.0000 # replacement rate (i.e., repls/ref)
+ul3.wb_rate                  0.0000 # writeback rate (i.e., wrbks/ref)
+ul3.inv_rate                 0.0000 # invalidation rate (i.e., invs/ref)
+ld_text_base             0x00400000 # program text (code) segment base
+ld_text_size                  76896 # program text (code) size in bytes
+ld_data_base             0x10000000 # program initialized data segment base
+ld_data_size                1088528 # program init'ed `.data' and uninit'ed `.bss' size in bytes
+ld_stack_base            0x7fffc000 # program stack segment base (highest address in stack)
+ld_stack_size                 16384 # program initial stack size
+ld_prog_entry            0x00400140 # program entry point (initial PC)
+ld_environ_base          0x7fff8000 # program environment base address address
+ld_target_big_endian              0 # target executable endian-ness, non-zero if big endian
+mem.page_count                  291 # total number of pages allocated
+mem.page_mem                  1164k # total size of memory pages allocated
+mem.ptab_misses                 291 # total first level page table misses
+mem.ptab_accesses        8328237346 # total page table accesses
+mem.ptab_miss_rate           0.0000 # first level page table miss rate
