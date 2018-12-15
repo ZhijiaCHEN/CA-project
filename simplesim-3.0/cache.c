@@ -278,7 +278,7 @@ cache_create(char *name,               /* name of the cache */
              int balloc,               /* allocate data space for blocks? */
              int usize,                /* size of user data to alloc w/blks */
              int assoc,                /* associativity of cache */
-             int shared,                /* 1 for shared cache, otherwise private. MULTICORE added */
+             int shared,               /* 1 for shared cache, otherwise private. MULTICORE added */
              enum cache_policy policy, /* replacement policy w/in sets */
              /* block access function, see description w/in struct cache def */
              unsigned int (*blk_access_fn)(enum mem_cmd cmd,
@@ -318,19 +318,19 @@ cache_create(char *name,               /* name of the cache */
     if (shared != 1) // private cache
     {
         cp = (struct cache_t *)
-                calloc(1, cacheSize);
+            calloc(1, cacheSize);
         if (!cp)
             fatal("Dynamic memory allocation failed.");
         printf("creating private cache %s in process %d\n", name, getpid());
     }
     else // shared cache
     {
-        shmid = shmget(IPC_PRIVATE, cacheSize, 0666|IPC_CREAT);
+        shmid = shmget(IPC_PRIVATE, cacheSize, 0666 | IPC_CREAT);
         cp = (struct cache_t *)
-                shmat(shmid, NULL, 0);
+            shmat(shmid, NULL, 0);
         if (!cp)
             fatal("Shared memory allocation failed.");
-        
+
         memset(cp, 0, cacheSize);
         cp->shmid = shmid;
         pthread_mutexattr_init(&cp->mutexattr);
@@ -338,7 +338,7 @@ cache_create(char *name,               /* name of the cache */
         pthread_mutex_init(&cp->mutex, &cp->mutexattr);
         printf("creating shared cache %s in process %d\n", name, getpid());
     }
-    cp->shared = shared; 
+    cp->shared = shared;
     /* MULTICORE modification end. */
 
     /* initialize user parameters */
@@ -457,7 +457,7 @@ cache_char2policy(char c) /* replacement policy as a char */
         return Random;
     case 'f':
         return FIFO;
-    case 'u': 
+    case 'u':
         return LFU;
     default:
         fatal("bogus replacement policy, `%c'", c);
@@ -476,9 +476,9 @@ void cache_config(struct cache_t *cp, /* cache instance */
             cp->name, cp->assoc,
             cp->policy == LRU ? "LRU"
                               : cp->policy == Random ? "Random"
-                              : cp->policy == FIFO ? "FIFO"
-                              : cp->policy == LFU ? "LFU"
-                              : (abort(), ""));
+                                                     : cp->policy == FIFO ? "FIFO"
+                                                                          : cp->policy == LFU ? "LFU"
+                                                                                              : (abort(), ""));
 }
 
 /* register cache stats */
@@ -631,44 +631,43 @@ cache_access(struct cache_t *cp,   /* cache to access */
         break;
     case Random:
     {
-       		int bindex = myrand() & (cp->assoc - 1);
-		repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
-		while (repl->presentCnt != 0)
-		{
-			int bindex = myrand() & (cp->assoc - 1);
-			repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
-		}
+        int bindex = myrand() & (cp->assoc - 1);
+        repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+        while (repl->presentCnt != 0)
+        {
+            int bindex = myrand() & (cp->assoc - 1);
+            repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+        }
     }
-    case LFU:// LFU added
-    {   /* Find the least frequently used block*/
-       int min;
+    case LFU: // LFU added
+    {         /* Find the least frequently used block*/
+        int min;
 
-		for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
-		{
-			if (blk->presentCnt == 0)
-			{
-				min = blk->useCnt;
-				break;
-			}
+        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+        {
+            if (blk->presentCnt == 0)
+            {
+                min = blk->useCnt;
+                break;
+            }
+        }
 
-		}
-		
-		for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
-		{
-			if (blk->useCnt<min && blk->presentCnt==0)
-			{
-				min = blk->useCnt;
-			}
-		}
+        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+        {
+            if (blk->useCnt < min && blk->presentCnt == 0)
+            {
+                min = blk->useCnt;
+            }
+        }
 
-		for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
-		{
-			if (blk->useCnt==min && blk->presentCnt == 0)
-			{
-				repl= blk;
-				break;
-			}
-		}
+        for (blk = cp->sets[set].way_head; blk; blk = blk->way_next)
+        {
+            if (blk->useCnt == min && blk->presentCnt == 0)
+            {
+                repl = blk;
+                break;
+            }
+        }
     }
     break;
     default:
@@ -710,23 +709,21 @@ cache_access(struct cache_t *cp,   /* cache to access */
         }
 
         /* update presence count, INCLUSIVE added */
-        if (cp->policy == LFU)
-            cp->blk_present_fn(-1, CACHE_MK_BADDR(cp, repl->tag, set));
+        cp->blk_present_fn(-1, CACHE_MK_BADDR(cp, repl->tag, set));
     }
 
     /* update block tags */
     repl->tag = tag;
     repl->status = CACHE_BLK_VALID; /* dirty bit set on update */
-    repl->presentCnt = 0; /* reset present count. INCLUSIVE added. */
-    repl->useCnt = 0; /* reset use count. LFU added. */
+    repl->presentCnt = 0;           /* reset present count. INCLUSIVE added. */
+    repl->useCnt = 0;               /* reset use count. LFU added. */
 
     /* read data block */
     lat += cp->blk_access_fn(Read, CACHE_BADDR(cp, addr), cp->bsize,
                              repl, now + lat);
 
     /* update presence count, INCLUSIVE added */
-    if (cp->policy == LFU)
-        cp->blk_present_fn(1, CACHE_BADDR(cp, addr));
+    cp->blk_present_fn(1, CACHE_BADDR(cp, addr));
 
     /* copy data out of cache block */
     if (cp->balloc)
@@ -904,7 +901,7 @@ void update_block_present_count(struct cache_t *cp, /* cache where the block bel
             {
                 blk->presentCnt += increase;
                 //printf("block address %d count after update: %d\n", addr, blk->presentCnt);
-                
+
                 /* unlock cache before return if shared. MULTICORE added. */
                 if (cp->shared == 1)
                     pthread_mutex_unlock(&cp->mutex);
